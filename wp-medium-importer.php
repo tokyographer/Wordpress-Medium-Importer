@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Medium Importer
 Description: Import Medium posts from a zip archive into WordPress.
-Version: 1.7
+Version: 1.8
 Author: Your Name
 */
 
@@ -130,7 +130,7 @@ function wpmi_handle_upload() {
 function wpmi_import_posts() {
     if (isset($_POST['file'])) {
         $file = sanitize_text_field($_POST['file']);
-        if (file_exists($file) && strpos(basename($file), 'draft') === false) {
+        if (file_exists($file) && strpos(basename($file), 'draft_') === false) {
             error_log("wpmi_import_posts: Importing file $file", 3, WPMI_LOG_FILE);
             wpmi_import_post($file);
             wp_send_json_success();
@@ -158,7 +158,7 @@ function wpmi_import_post($file) {
     // Extract post date, title, and content from file name and HTML content
     $filename = basename($file, ".html");
     $parts = explode('_', $filename, 3);
-    if (count($parts) < 3) {
+    if (count($parts) < 2) {
         error_log("wpmi_import_post: Invalid file name format - $filename", 3, WPMI_LOG_FILE);
         return;
     }
