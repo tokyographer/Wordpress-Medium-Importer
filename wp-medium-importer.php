@@ -2,8 +2,8 @@
 /*
 Plugin Name: WP Medium Importer
 Description: Import Medium posts from a zip archive into WordPress.
-Version: 1.5
-Author: Your Name
+Version: 1.6
+Author: Anthony T
 */
 
 // Hook to add admin menu item
@@ -107,7 +107,11 @@ function wpmi_handle_upload() {
             $zip->extractTo($extractPath);
             $zip->close();
             $files = glob($extractPath . '/posts/*.html');
-            wp_send_json_success(array('files' => $files));
+            if ($files === false) {
+                wp_send_json_error('No files found in the extracted zip.');
+            } else {
+                wp_send_json_success(array('files' => $files));
+            }
         } else {
             wp_send_json_error('Failed to open the zip file.');
         }
@@ -120,7 +124,7 @@ function wpmi_handle_upload() {
 function wpmi_import_posts() {
     if (isset($_POST['file'])) {
         $file = sanitize_text_field($_POST['file']);
-        if (basename($file, ".html") !== '.' && strpos(basename($file), 'draft') === false) {
+        if (file_exists($file) && strpos(basename($file), 'draft') === false) {
             wpmi_import_post($file);
             wp_send_json_success();
         } else {
@@ -134,6 +138,11 @@ function wpmi_import_posts() {
 // Import a single post
 function wpmi_import_post($file) {
     $content = file_get_contents($file);
+    if ($content === false) {
+        error_log("Failed to read file content: $file");
+        return;
+    }
+
     $doc = new DOMDocument();
     @$doc->loadHTML($content);
 
@@ -149,6 +158,11 @@ function wpmi_import_post($file) {
     $post_date = date('Y-m-d H:i:s', strtotime($date));
 
     $body = $doc->getElementsByTagName('body')->item(0);
+    if (!$body) {
+        error_log("No body tag found in file: $file");
+        return;
+    }
+
     $innerHTML = '';
     foreach ($body->childNodes as $child) {
         $innerHTML .= $doc->saveHTML($child);
