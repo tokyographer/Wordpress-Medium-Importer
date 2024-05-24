@@ -2,8 +2,8 @@
 /*
 Plugin Name: WP Medium Importer
 Description: Import Medium posts from a zip archive into WordPress.
-Version: 1.6
-Author: Anthony T
+Version: 1.7
+Author: Your Name
 */
 
 // Hook to add admin menu item
@@ -108,14 +108,17 @@ function wpmi_handle_upload() {
             $zip->close();
             $files = glob($extractPath . '/posts/*.html');
             if ($files === false) {
+                error_log("wpmi_handle_upload: No files found in the extracted zip.");
                 wp_send_json_error('No files found in the extracted zip.');
             } else {
                 wp_send_json_success(array('files' => $files));
             }
         } else {
+            error_log("wpmi_handle_upload: Failed to open the zip file.");
             wp_send_json_error('Failed to open the zip file.');
         }
     } else {
+        error_log("wpmi_handle_upload: No file uploaded.");
         wp_send_json_error('No file uploaded.');
     }
 }
@@ -125,12 +128,15 @@ function wpmi_import_posts() {
     if (isset($_POST['file'])) {
         $file = sanitize_text_field($_POST['file']);
         if (file_exists($file) && strpos(basename($file), 'draft') === false) {
+            error_log("wpmi_import_posts: Importing file $file");
             wpmi_import_post($file);
             wp_send_json_success();
         } else {
+            error_log("wpmi_import_posts: Invalid file or draft detected - $file");
             wp_send_json_error('Invalid file or draft detected.');
         }
     } else {
+        error_log("wpmi_import_posts: No file specified.");
         wp_send_json_error('No file specified.');
     }
 }
@@ -139,7 +145,7 @@ function wpmi_import_posts() {
 function wpmi_import_post($file) {
     $content = file_get_contents($file);
     if ($content === false) {
-        error_log("Failed to read file content: $file");
+        error_log("wpmi_import_post: Failed to read file content - $file");
         return;
     }
 
@@ -150,7 +156,7 @@ function wpmi_import_post($file) {
     $filename = basename($file, ".html");
     $parts = explode('_', $filename, 3);
     if (count($parts) < 3) {
-        error_log("Invalid file name format: $filename");
+        error_log("wpmi_import_post: Invalid file name format - $filename");
         return;
     }
     $date = $parts[0];
@@ -159,7 +165,7 @@ function wpmi_import_post($file) {
 
     $body = $doc->getElementsByTagName('body')->item(0);
     if (!$body) {
-        error_log("No body tag found in file: $file");
+        error_log("wpmi_import_post: No body tag found in file - $file");
         return;
     }
 
@@ -195,8 +201,14 @@ function wpmi_import_post($file) {
                     wp_update_attachment_metadata($attachment_id, $attach_data);
                     $new_src = wp_get_attachment_url($attachment_id);
                     $img->setAttribute('src', $new_src);
+                } else {
+                    error_log("wpmi_import_post: Failed to upload image - $filename");
                 }
+            } else {
+                error_log("wpmi_import_post: Failed to read image data - $src");
             }
+        } else {
+            error_log("wpmi_import_post: Invalid image URL - $src");
         }
     }
 
@@ -213,6 +225,11 @@ function wpmi_import_post($file) {
         'post_date'     => $post_date,
     );
 
-    wp_insert_post($post_data);
+    $post_id = wp_insert_post($post_data);
+    if (is_wp_error($post_id)) {
+        error_log("wpmi_import_post: Failed to insert post - " . $post_id->get_error_message());
+    } else {
+        error_log("wpmi_import_post: Successfully inserted post - $post_id");
+    }
 }
 ?>
